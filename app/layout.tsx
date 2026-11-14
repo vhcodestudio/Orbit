@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Onest, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from './auth-provider';
 
-const geistSans = Geist({
+const geistSans = Onest({
   variable: '--font-geist-sans',
   subsets: ['latin'],
 });
