@@ -21,7 +21,7 @@ export default function PrivacyPage() {
       <h2>Your choices</h2>
       <p>
         You can explore Orbit without an account and sign out at any time.
-        Contact ytvitorgamer6@gmail.com with privacy questions.
+        Contact vhcodestudio@gmail.com with privacy questions.
       </p>
     </main>
   );

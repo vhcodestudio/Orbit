@@ -21,7 +21,7 @@ export default function TermsPage() {
       <h2>Availability</h2>
       <p>
         The demo is provided as-is and may change as the portfolio evolves.
-        Contact ytvitorgamer6@gmail.com with questions.
+        Contact vhcodestudio@gmail.com with questions.
       </p>
     </main>
   );
