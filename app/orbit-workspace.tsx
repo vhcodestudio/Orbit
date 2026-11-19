@@ -62,6 +62,7 @@ import {
 } from '@/components/ui/command';
 import { toast, Toaster } from '@/components/ui/toast';
 import { signIn, signOut, useSession } from 'next-auth/react';
+import { dicts, LangSwitch, useLang } from './i18n';
 
 type Status = 'Backlog' | 'Todo' | 'In Progress' | 'Review' | 'Done';
 type Issue = {
@@ -226,11 +227,12 @@ function GoogleMark() {
   );
 }
 function Priority({ value }: { value: Issue['priority'] }) {
+  const { t } = useLang();
   const bars = { Low: 1, Medium: 2, High: 3, Urgent: 4 }[value];
   return (
     <span
       className={`priority priority-${value.toLowerCase()}`}
-      aria-label={`${value} priority`}
+      aria-label={t.priorityLabel(t.priority[value])}
     >
       {[1, 2, 3, 4].map((n) => (
         <i key={n} className={n <= bars ? 'on' : ''} />
@@ -246,6 +248,7 @@ function IssueCard({
   onOpen: (i: Issue) => void;
 }) {
   const d = useDraggable({ id: issue.id, data: { issue } });
+  const { t } = useLang();
   return (
     <article
       ref={d.setNodeRef}
@@ -274,7 +277,7 @@ function IssueCard({
       <h3>{issue.title}</h3>
       <div className="labels">
         {issue.labels.map((x) => (
-          <span key={x}>{x}</span>
+          <span key={x}>{t.labels[x] ?? x}</span>
         ))}
       </div>
       <div className="issue-footer">
@@ -289,6 +292,7 @@ function IssueCard({
 }
 
 function IssueCardPreview({ issue }: { issue: Issue }) {
+  const { t } = useLang();
   return (
     <article className="issue-card drag-preview" aria-hidden="true">
       <div className="issue-meta">
@@ -298,7 +302,7 @@ function IssueCardPreview({ issue }: { issue: Issue }) {
       <h3>{issue.title}</h3>
       <div className="labels">
         {issue.labels.map((label) => (
-          <span key={label}>{label}</span>
+          <span key={label}>{t.labels[label] ?? label}</span>
         ))}
       </div>
       <div className="issue-footer">
@@ -323,6 +327,7 @@ function BoardColumn({
   onAdd: () => void;
 }) {
   const d = useDroppable({ id: status });
+  const { t } = useLang();
   return (
     <section
       ref={d.setNodeRef}
@@ -333,10 +338,10 @@ function BoardColumn({
           <i
             className={`status-dot status-${status.replace(' ', '-').toLowerCase()}`}
           />
-          <h2>{status}</h2>
+          <h2>{t.status[status]}</h2>
           <span>{issues.length}</span>
         </div>
-        <button onClick={onAdd} aria-label={`Add issue to ${status}`}>
+        <button onClick={onAdd} aria-label={t.column.add(t.status[status])}>
           <Plus />
         </button>
       </header>
@@ -347,7 +352,7 @@ function BoardColumn({
         {issues.length === 0 && (
           <button className="empty-column" onClick={onAdd}>
             <Plus />
-            Add the first issue
+            {t.column.first}
           </button>
         )}
       </div>
@@ -372,13 +377,21 @@ export function OrbitWorkspace() {
     [authOpen, setAuthOpen] = useState(false),
     [authLoading, setAuthLoading] = useState(false);
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+  const { t } = useLang();
+  // Sample issue titles follow the chosen language (titles the user edited stay as typed).
+  useEffect(() => {
+    setIssues((items) => items.map((i) => {
+      const known = Object.values(dicts).map((d) => d.issues[i.id]);
+      return t.issues[i.id] && known.includes(i.title) ? { ...i, title: t.issues[i.id] } : i;
+    }));
+  }, [t]);
   const { data: session } = useSession();
   const account = session?.user
     ? {
         name:
           session.user.name ??
           session.user.email?.split('@')[0] ??
-          'Orbit member',
+          t.member,
         email: session.user.email ?? '',
       }
     : null;
@@ -436,8 +449,8 @@ export function OrbitWorkspace() {
       x.map((i) => (i.id === id ? { ...i, status, updated: 'now' } : i)),
     );
     toast.add({
-      title: 'Issue updated',
-      description: `${id} moved to ${status}.`,
+      title: t.toast.updated,
+      description: t.toast.moved(id, t.status[status]),
       type: 'success',
     });
   };
@@ -458,8 +471,8 @@ export function OrbitWorkspace() {
     setTitle('');
     setCreate(false);
     toast.add({
-      title: 'Issue created',
-      description: `${issue.id} is ready in Todo.`,
+      title: t.toast.created,
+      description: t.toast.ready(issue.id),
       type: 'success',
     });
   };
@@ -480,14 +493,14 @@ export function OrbitWorkspace() {
     const copy = {
       ...selected,
       id: `ORB-${150 + issues.length}`,
-      title: `${selected.title} (copy)`,
+      title: t.copy(selected.title),
       updated: 'now',
     };
     setIssues((items) => [copy, ...items]);
     setSelected(copy);
     toast.add({
-      title: 'Issue duplicated',
-      description: `${copy.id} is ready to edit.`,
+      title: t.toast.duplicated,
+      description: t.toast.editable(copy.id),
       type: 'success',
     });
   };
@@ -495,17 +508,16 @@ export function OrbitWorkspace() {
     if (!selected) return;
     setIssues((items) => items.filter((item) => item.id !== selected.id));
     toast.add({
-      title: 'Issue deleted',
-      description: `${selected.id} was removed from this demo.`,
+      title: t.toast.deleted,
+      description: t.toast.removed(selected.id),
       type: 'success',
     });
     setSelected(null);
   };
   const demoNotice = (feature: string) =>
     toast.add({
-      title: `${feature} preview`,
-      description:
-        'This portfolio demo keeps the experience local and reversible.',
+      title: t.toast.preview(feature),
+      description: t.toast.local,
       type: 'success',
     });
   const signInWithGoogle = async () => {
@@ -515,8 +527,8 @@ export function OrbitWorkspace() {
     } catch {
       setAuthLoading(false);
       toast.add({
-        title: 'Could not start Google sign-in',
-        description: 'Please try again or continue exploring the demo.',
+        title: t.toast.googleFail,
+        description: t.toast.googleFailText,
         type: 'error',
       });
     }
@@ -525,26 +537,16 @@ export function OrbitWorkspace() {
     await signOut({ redirect: false });
     setAuthOpen(false);
     toast.add({
-      title: 'Signed out',
-      description: 'You can keep exploring Orbit in demo mode.',
+      title: t.toast.signedOut,
+      description: t.toast.signedOutText,
       type: 'success',
     });
   };
-  const heading =
-    view === 'board'
-      ? 'Build the next orbit'
-      : (
-          {
-            list: 'All issues',
-            roadmap: 'Roadmap',
-            projects: 'Projects',
-            inbox: 'Inbox',
-          } as Record<string, string>
-        )[view];
+  const heading = t.headings[view];
   return (
     <Toaster>
       <a className="orbit-skip" href="#orbit-content">
-        Skip to workspace
+        {t.skip}
       </a>
       <div className="app-shell">
         <aside
@@ -552,7 +554,7 @@ export function OrbitWorkspace() {
         >
           <button
             className="workspace"
-            onClick={() => demoNotice('Workspace switcher')}
+            onClick={() => demoNotice(t.features.switcher)}
           >
             <div className="orbit-mark">
               <i />
@@ -562,50 +564,50 @@ export function OrbitWorkspace() {
             {!collapsed && (
               <div>
                 <strong>Orbit Labs</strong>
-                <span>Product workspace · Demo</span>
+                <span>{t.sidebar.workspaceSub}</span>
               </div>
             )}
             <ChevronDown className="chevron" />
           </button>
-          <nav aria-label="Workspace navigation">
+          <nav aria-label={t.sidebar.navLabel}>
             {nav.map((n) => (
               <button
                 key={n.label}
                 className={n.view === view ? 'active' : ''}
                 aria-current={n.view === view ? 'page' : undefined}
-                onClick={() => (n.view ? choose(n.view) : demoNotice(n.label))}
+                onClick={() => (n.view ? choose(n.view) : demoNotice(t.nav[n.label]))}
               >
                 <n.icon />
-                <span>{n.label}</span>
+                <span>{t.nav[n.label]}</span>
                 {n.badge && <b>{n.badge}</b>}
               </button>
             ))}
           </nav>
           <div className="nav-group">
-            <p>Favorites</p>
+            <p>{t.sidebar.favorites}</p>
             <button onClick={() => choose('board')}>
               <span className="project-glyph violet">V</span>
               <span>Velocity</span>
             </button>
             <button onClick={() => choose('projects')}>
               <span className="project-glyph coral">C</span>
-              <span>Core experience</span>
+              <span>{t.projects['Core experience']}</span>
             </button>
           </div>
           <div className="sidebar-foot">
             <button onClick={() => setDark((v) => !v)}>
               {dark ? <Sun /> : <Moon />}
-              <span>{dark ? 'Light mode' : 'Dark mode'}</span>
+              <span>{dark ? t.sidebar.light : t.sidebar.dark}</span>
             </button>
-            <button onClick={() => demoNotice('Settings')}>
+            <button onClick={() => demoNotice(t.features.settings)}>
               <Settings />
-              <span>Settings</span>
+              <span>{t.sidebar.settings}</span>
             </button>
           </div>
           <button
             className="sidebar-collapse"
             onClick={() => setCollapsed((v) => !v)}
-            aria-label="Collapse sidebar"
+            aria-label={t.sidebar.collapse}
           >
             <ChevronsLeft />
           </button>
@@ -614,7 +616,7 @@ export function OrbitWorkspace() {
           <button
             className="mobile-scrim"
             onClick={() => setMobile(false)}
-            aria-label="Close sidebar"
+            aria-label={t.sidebar.close}
           />
         )}
         <main className="main-shell">
@@ -622,7 +624,7 @@ export function OrbitWorkspace() {
             <button
               className="mobile-menu"
               onClick={() => setMobile(true)}
-              aria-label="Open menu"
+              aria-label={t.top.menu}
             >
               <Menu />
             </button>
@@ -633,24 +635,25 @@ export function OrbitWorkspace() {
             </div>
             <button
               className="search-trigger"
-              aria-label="Search or jump to… ⌘ K"
+              aria-label={`${t.top.search} ⌘ K`}
               onClick={() => setCommands(true)}
             >
               <Search />
-              <span>Search or jump to…</span>
+              <span>{t.top.search}</span>
               <kbd>⌘ K</kbd>
             </button>
             <div className="top-actions">
+              <LangSwitch />
               <button
-                onClick={() => demoNotice('Activity')}
-                aria-label="Open activity"
+                onClick={() => demoNotice(t.features.activity)}
+                aria-label={t.top.activity}
               >
                 <Activity />
               </button>
               <button
                 className="notification"
                 onClick={() => choose('inbox')}
-                aria-label="Open notifications"
+                aria-label={t.top.notifications}
               >
                 <Bell />
                 <i />
@@ -660,13 +663,13 @@ export function OrbitWorkspace() {
                 onClick={() => setAuthOpen(true)}
                 aria-label={
                   account
-                    ? `${account.name
+                    ? t.top.account(account.name
                         .split(' ')
                         .map((part) => part[0])
                         .join('')
                         .slice(0, 2)
-                        .toUpperCase()} Account: ${account.name}`
-                    : 'VK Sign in'
+                        .toUpperCase(), account.name)
+                    : t.top.signIn
                 }
               >
                 <span aria-hidden="true">
@@ -690,35 +693,34 @@ export function OrbitWorkspace() {
             className="content"
             id="orbit-content"
             tabIndex={-1}
-            aria-label="Workspace content"
+            aria-label={t.content}
           >
             <div className="workspace-notice">
               <CircleDot aria-hidden="true" size={14} />
               <span>
-                Portfolio demo. Tasks and changes stay in this browser session.
+                {t.notice}
               </span>
             </div>
             <div className="page-heading">
               <div>
                 <div className="eyebrow">
-                  <span className="project-glyph violet">V</span>Velocity ·
-                  Engineering
+                  <span className="project-glyph violet">V</span>{t.eyebrow}
                 </div>
                 <h1>{heading}</h1>
                 <p>
                   {view === 'board'
-                    ? 'A focused cycle for the interactions that make teams feel fast.'
-                    : 'Everything your team needs, in one calm workspace.'}
+                    ? t.boardLead
+                    : t.otherLead}
                 </p>
               </div>
               <div className="heading-actions">
                 <Button variant="outline" onClick={() => setCommands(true)}>
                   <Search />
-                  Search
+                  {t.searchBtn}
                 </Button>
                 <Button onClick={() => setCreate(true)}>
                   <Plus />
-                  New issue
+                  {t.newIssue}
                 </Button>
               </div>
             </div>
@@ -728,23 +730,23 @@ export function OrbitWorkspace() {
                   <div className="cycle-orbit">
                     <progress
                       className="sr-only"
-                      aria-label="Cycle completion"
+                      aria-label={t.cycle.label}
                       max={100}
                       value={progress}
                     />
                     <span>{progress}%</span>
                   </div>
                   <div>
-                    <span>Cycle 08</span>
-                    <strong>Momentum</strong>
+                    <span>{t.cycle.name}</span>
+                    <strong>{t.cycle.momentum}</strong>
                     <small>
-                      Sample cycle · {done} of {issues.length} complete
+                      {t.cycle.sample(done, issues.length)}
                     </small>
                   </div>
                   <div className="cycle-metrics">
                     <div>
                       <b>{points}</b>
-                      <span>points</span>
+                      <span>{t.cycle.points}</span>
                     </div>
                     <div>
                       <b>
@@ -754,7 +756,7 @@ export function OrbitWorkspace() {
                           ).length
                         }
                       </b>
-                      <span>in progress</span>
+                      <span>{t.cycle.inProgress}</span>
                     </div>
                     <div className="members">
                       <Avatar initials="VK" small />
@@ -768,11 +770,11 @@ export function OrbitWorkspace() {
                   <div className="view-tabs">
                     <button className="active">
                       <Layers3 />
-                      Board
+                      {t.viewBoard}
                     </button>
                     <button onClick={() => setView('list')}>
                       <List />
-                      List
+                      {t.viewList}
                     </button>
                   </div>
                   <div className="view-tools">
@@ -781,46 +783,46 @@ export function OrbitWorkspace() {
                       aria-expanded={filterOpen}
                     >
                       <Filter />
-                      Filter {activeFilters > 0 && <b>{activeFilters}</b>}
+                      {t.filter} {activeFilters > 0 && <b>{activeFilters}</b>}
                     </button>
                     <button
                       className={assigneeFilter !== 'All' ? 'is-active' : ''}
                       onClick={() => setFilterOpen(true)}
                     >
                       <Users />
-                      Assignee
+                      {t.assignee}
                     </button>
                     <button
-                      onClick={() => demoNotice('Board options')}
-                      aria-label="Board options"
+                      onClick={() => demoNotice(t.features.board)}
+                      aria-label={t.features.board}
                     >
                       <MoreHorizontal />
                     </button>
                   </div>
                 </div>
                 {filterOpen && (
-                  <div className="filter-panel" aria-label="Issue filters">
+                  <div className="filter-panel" aria-label={t.filters}>
                     <label>
-                      Status
+                      {t.statusField}
                       <select
                         value={statusFilter}
                         onChange={(e) =>
                           setStatusFilter(e.target.value as Status | 'All')
                         }
                       >
-                        <option>All</option>
+                        <option value="All">{t.all}</option>
                         {columns.map((status) => (
-                          <option key={status}>{status}</option>
+                          <option key={status} value={status}>{t.status[status]}</option>
                         ))}
                       </select>
                     </label>
                     <label>
-                      Assignee
+                      {t.assignee}
                       <select
                         value={assigneeFilter}
                         onChange={(e) => setAssigneeFilter(e.target.value)}
                       >
-                        <option>All</option>
+                        <option value="All">{t.all}</option>
                         {Object.keys(colors).map((person) => (
                           <option key={person}>{person}</option>
                         ))}
@@ -832,7 +834,7 @@ export function OrbitWorkspace() {
                         setAssigneeFilter('All');
                       }}
                     >
-                      Clear filters
+                      {t.clear}
                     </button>
                   </div>
                 )}
@@ -886,13 +888,13 @@ export function OrbitWorkspace() {
         <CommandDialog
           open={commands}
           onOpenChange={setCommands}
-          title="Orbit command menu"
+          title={t.cmd.title}
         >
           <Command>
-            <CommandInput placeholder="Search issues, projects, people…" />
+            <CommandInput placeholder={t.cmd.ph} />
             <CommandList>
-              <CommandEmpty>No results found.</CommandEmpty>
-              <CommandGroup heading="Navigate">
+              <CommandEmpty>{t.cmd.empty}</CommandEmpty>
+              <CommandGroup heading={t.cmd.navigate}>
                 {nav
                   .filter((n) => n.view)
                   .map((n) => (
@@ -904,11 +906,11 @@ export function OrbitWorkspace() {
                       }}
                     >
                       <n.icon />
-                      {n.label}
+                      {t.nav[n.label]}
                     </CommandItem>
                   ))}
               </CommandGroup>
-              <CommandGroup heading="Actions">
+              <CommandGroup heading={t.cmd.actions}>
                 <CommandItem
                   onSelect={() => {
                     setCommands(false);
@@ -916,10 +918,10 @@ export function OrbitWorkspace() {
                   }}
                 >
                   <Plus />
-                  Create issue<CommandShortcut>C</CommandShortcut>
+                  {t.cmd.create}<CommandShortcut>C</CommandShortcut>
                 </CommandItem>
                 <CommandItem onSelect={() => setDark((v) => !v)}>
-                  {dark ? <Sun /> : <Moon />}Toggle theme
+                  {dark ? <Sun /> : <Moon />}{t.cmd.theme}
                 </CommandItem>
                 <CommandItem
                   onSelect={() => {
@@ -928,10 +930,10 @@ export function OrbitWorkspace() {
                   }}
                 >
                   <Search />
-                  Search all issues
+                  {t.cmd.searchAll}
                 </CommandItem>
               </CommandGroup>
-              <CommandGroup heading="Recent issues">
+              <CommandGroup heading={t.cmd.recent}>
                 {issues.slice(0, 5).map((issue) => (
                   <CommandItem
                     key={issue.id}
@@ -945,7 +947,7 @@ export function OrbitWorkspace() {
                     <span className="command-issue">
                       <strong>{issue.title}</strong>
                       <small>
-                        {issue.id} · {issue.status}
+                        {issue.id} · {t.status[issue.status]}
                       </small>
                     </span>
                   </CommandItem>
@@ -957,29 +959,29 @@ export function OrbitWorkspace() {
         <Dialog open={create} onOpenChange={setCreate}>
           <DialogContent className="create-dialog">
             <DialogHeader>
-              <DialogTitle>Create issue</DialogTitle>
+              <DialogTitle>{t.create.title}</DialogTitle>
               <DialogDescription>
-                Capture the work now. Add details when the team is ready.
+                {t.create.desc}
               </DialogDescription>
             </DialogHeader>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && make()}
-              placeholder="Issue title"
+              placeholder={t.create.ph}
             />
             <div className="quick-fields">
-              <button onClick={() => demoNotice('Status picker')}>
+              <button onClick={() => demoNotice(t.features.status)}>
                 <CircleDot />
-                Todo
+                {t.status.Todo}
                 <ChevronDown />
               </button>
-              <button onClick={() => demoNotice('Priority picker')}>
+              <button onClick={() => demoNotice(t.features.priority)}>
                 <Zap />
-                Medium
+                {t.priority.Medium}
                 <ChevronDown />
               </button>
-              <button onClick={() => demoNotice('Assignee picker')}>
+              <button onClick={() => demoNotice(t.features.assignee)}>
                 <Avatar initials="VK" small />
                 Victor
                 <ChevronDown />
@@ -987,10 +989,10 @@ export function OrbitWorkspace() {
             </div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setCreate(false)}>
-                Cancel
+                {t.create.cancel}
               </Button>
               <Button onClick={make} disabled={!title.trim()}>
-                Create issue <kbd>↵</kbd>
+                {t.create.submit} <kbd>↵</kbd>
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1001,18 +1003,18 @@ export function OrbitWorkspace() {
             <DialogHeader>
               <DialogTitle>
                 {account
-                  ? `Welcome, ${account.name}`
-                  : 'Join your team in Orbit'}
+                  ? t.auth.welcome(account.name)
+                  : t.auth.join}
               </DialogTitle>
               <DialogDescription>
                 {account
                   ? account.email
-                  : 'Create your account or sign in securely with Google. You can also keep exploring this portfolio demo.'}
+                  : t.auth.desc}
               </DialogDescription>
             </DialogHeader>
             {account ? (
               <Button variant="outline" onClick={handleSignOut}>
-                Sign out
+                {t.auth.signOut}
               </Button>
             ) : (
               <button
@@ -1021,11 +1023,11 @@ export function OrbitWorkspace() {
                 disabled={authLoading}
               >
                 <GoogleMark />
-                {authLoading ? 'Opening Google…' : 'Continue with Google'}
+                {authLoading ? t.auth.opening : t.auth.google}
               </button>
             )}
             <p className="auth-demo-note">
-              Portfolio demo · no account required to explore
+              {t.auth.note}
             </p>
           </DialogContent>
         </Dialog>
@@ -1039,16 +1041,16 @@ export function OrbitWorkspace() {
                     <i
                       className={`status-dot status-${selected.status.replace(' ', '-').toLowerCase()}`}
                     />
-                    <strong>{selected.status}</strong>
+                    <strong>{t.status[selected.status]}</strong>
                   </div>
                   <div>
-                    <button onClick={duplicateSelected}>Duplicate</button>
+                    <button onClick={duplicateSelected}>{t.issue.duplicate}</button>
                     <button className="danger-action" onClick={deleteSelected}>
-                      Delete
+                      {t.issue.del}
                     </button>
                     <button
                       onClick={() => setSelected(null)}
-                      aria-label="Close issue"
+                      aria-label={t.issue.close}
                     >
                       <X />
                     </button>
@@ -1062,56 +1064,53 @@ export function OrbitWorkspace() {
                       onChange={(e) =>
                         updateSelected({ title: e.target.value })
                       }
-                      aria-label="Issue title"
+                      aria-label={t.issue.titleLabel}
                     />
                   </DialogTitle>
                   <DialogDescription>
-                    {selected.project} · updated {selected.updated} ago
+                    {t.issue.updated(t.projects[selected.project] ?? selected.project, t.ago(selected.updated))}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="issue-detail-grid">
                   <div className="issue-description">
                     <p>
-                      Improve this surface so the team can move through work
-                      without losing context. Keep the interaction quick,
-                      resilient, and accessible.
+                      {t.issue.body}
                     </p>
-                    <h4>Subtasks</h4>
+                    <h4>{t.issue.subtasks}</h4>
                     <label>
-                      <input type="checkbox" defaultChecked /> Define
-                      interaction states
+                      <input type="checkbox" defaultChecked /> {t.issue.sub1}
                     </label>
                     <label>
-                      <input type="checkbox" /> Verify keyboard flow
+                      <input type="checkbox" /> {t.issue.sub2}
                     </label>
-                    <h4>Activity</h4>
+                    <h4>{t.issue.activity}</h4>
                     <div className="activity-row">
                       <Avatar initials="VK" small />
                       <p>
-                        <strong>Victor</strong> moved this issue
+                        <strong>Victor</strong> {t.issue.moved}
                         <br />
-                        <span>Todo → {selected.status}</span>
+                        <span>{t.status.Todo} → {t.status[selected.status]}</span>
                       </p>
                       <small>12m</small>
                     </div>
                     <div className="activity-row muted-event">
                       <span className="timeline-dot" />
                       <p>
-                        <strong>Orbit automation</strong> added{' '}
-                        <span>{selected.labels[0]}</span>
+                        <strong>{t.issue.automation}</strong> {t.issue.added}{' '}
+                        <span>{t.labels[selected.labels[0]] ?? selected.labels[0]}</span>
                       </p>
                       <small>18m</small>
                     </div>
                     <div className="comment-box">
                       <MessageSquare />
-                      <input placeholder="Leave a comment…" />
+                      <input placeholder={t.issue.comment} />
                     </div>
                   </div>
                   <aside>
                     <Property
                       icon={CircleDot}
-                      label="Status"
-                      value={selected.status}
+                      label={t.issue.status}
+                      value={t.status[selected.status]}
                       onClick={() =>
                         updateSelected({
                           status:
@@ -1124,8 +1123,8 @@ export function OrbitWorkspace() {
                     />
                     <Property
                       icon={Zap}
-                      label="Priority"
-                      value={selected.priority}
+                      label={t.issue.priority}
+                      value={t.priority[selected.priority]}
                       onClick={() => {
                         const values: Issue['priority'][] = [
                           'Low',
@@ -1144,7 +1143,7 @@ export function OrbitWorkspace() {
                     />
                     <Property
                       icon={Users}
-                      label="Assignee"
+                      label={t.issue.assignee}
                       value={selected.assignee}
                       onClick={() => {
                         const values = Object.keys(colors);
@@ -1159,13 +1158,13 @@ export function OrbitWorkspace() {
                     />
                     <Property
                       icon={Rocket}
-                      label="Project"
-                      value={selected.project}
+                      label={t.issue.project}
+                      value={t.projects[selected.project] ?? selected.project}
                     />
                     <Property
                       icon={CalendarDays}
-                      label="Due date"
-                      value="Sep 12"
+                      label={t.issue.due}
+                      value={t.issue.dueValue}
                     />
                   </aside>
                 </div>
@@ -1212,6 +1211,7 @@ function ListView({
   onBoard: () => void;
 }) {
   const [sort, setSort] = useState<'updated' | 'priority'>('updated');
+  const { t } = useLang();
   const priorities: Record<Issue['priority'], number> = {
     Low: 1,
     Medium: 2,
@@ -1229,11 +1229,11 @@ function ListView({
         <div className="view-tabs">
           <button onClick={onBoard}>
             <Layers3 />
-            Board
+            {t.viewBoard}
           </button>
           <button className="active">
             <List />
-            List
+            {t.viewList}
           </button>
         </div>
         <div className="input-search">
@@ -1241,7 +1241,7 @@ function ListView({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter issues…"
+            placeholder={t.list.filter}
           />
         </div>
         <Button
@@ -1249,17 +1249,12 @@ function ListView({
           onClick={() => setSort(sort === 'updated' ? 'priority' : 'updated')}
         >
           <Filter />
-          Sort: {sort}
+          {t.list.sort(sort)}
         </Button>
       </div>
       <div className="issue-table">
         <div className="table-row table-head">
-          <span>Issue</span>
-          <span>Status</span>
-          <span>Priority</span>
-          <span>Assignee</span>
-          <span>Project</span>
-          <span>Updated</span>
+          {t.list.cols.map((c) => <span key={c}>{c}</span>)}
         </div>
         {rows.map((i) => (
           <button key={i.id} className="table-row" onClick={() => onOpen(i)}>
@@ -1272,25 +1267,25 @@ function ListView({
               <i
                 className={`status-dot status-${i.status.replace(' ', '-').toLowerCase()}`}
               />
-              {i.status}
+              {t.status[i.status]}
             </span>
             <span>
               <Priority value={i.priority} />
-              {i.priority}
+              {t.priority[i.priority]}
             </span>
             <span>
               <Avatar initials={i.assignee} small />
               {i.assignee}
             </span>
-            <span>{i.project}</span>
-            <span>{i.updated}</span>
+            <span>{t.projects[i.project] ?? i.project}</span>
+            <span>{t.ago(i.updated)}</span>
           </button>
         ))}
         {rows.length === 0 && (
           <div className="empty-list">
             <Search />
-            <strong>No issues found</strong>
-            <span>Try clearing your search or filters.</span>
+            <strong>{t.list.none}</strong>
+            <span>{t.list.noneText}</span>
           </div>
         )}
       </div>
@@ -1298,6 +1293,7 @@ function ListView({
   );
 }
 function Roadmap() {
+  const { t } = useLang();
   const ps = [
     ['Core experience', 'active', '74'],
     ['Realtime collaboration', 'active', '46'],
@@ -1307,19 +1303,16 @@ function Roadmap() {
   return (
     <div className="roadmap">
       <div className="roadmap-scale">
-        <span>SEP</span>
-        <span>OCT</span>
-        <span>NOV</span>
-        <span>DEC</span>
+        {t.roadmap.months.map((m) => <span key={m}>{m}</span>)}
       </div>
       {ps.map((p, n) => (
         <div className="roadmap-row" key={p[0]}>
           <div>
             <span className={`project-glyph ${n % 2 ? 'coral' : 'violet'}`}>
-              {p[0][0]}
+              {(t.projects[p[0]] ?? p[0])[0]}
             </span>
-            <strong>{p[0]}</strong>
-            <small>{p[1]}</small>
+            <strong>{t.projects[p[0]] ?? p[0]}</strong>
+            <small>{t.roadmap.state[p[1]]}</small>
           </div>
           <div className="timeline">
             <i className={`bar bar-${n}`}>
@@ -1332,6 +1325,7 @@ function Roadmap() {
   );
 }
 function Projects() {
+  const { t } = useLang();
   return (
     <div className="project-grid">
       {[
@@ -1352,8 +1346,8 @@ function Projects() {
             </span>
             <MoreHorizontal />
           </div>
-          <h3>{p[0]}</h3>
-          <p>{p[1]}</p>
+          <h3>{t.projects[p[0]] ?? p[0]}</h3>
+          <p>{t.projectCards[n]}</p>
           <div className="project-progress">
             <span>
               <i style={{ width: `${p[2]}%` }} />
@@ -1363,7 +1357,7 @@ function Projects() {
           <footer>
             <span>
               <CircleDot />
-              {p[3]} issues
+              {t.issuesCount(p[3])}
             </span>
             <div>
               <Avatar initials="VK" small />
@@ -1376,17 +1370,18 @@ function Projects() {
   );
 }
 function InboxView() {
+  const { t } = useLang();
   return (
     <div className="inbox-panel">
       <div className="inbox-tabs">
         <button className="active">
-          All <b>4</b>
+          {t.inbox.all} <b>4</b>
         </button>
-        <button>Mentions</button>
-        <button>Assigned</button>
+        <button>{t.inbox.mentions}</button>
+        <button>{t.inbox.assigned}</button>
         <Button variant="ghost">
           <Check />
-          Mark all read
+          {t.inbox.markRead}
         </Button>
       </div>
       {[
@@ -1421,8 +1416,8 @@ function InboxView() {
         >
           <Avatar initials={n[0]} />
           <span>
-            <strong>{n[1]}</strong>
-            <p>{n[2]}</p>
+            <strong>{t.inbox.rows[i][0]}</strong>
+            <p>{t.inbox.rows[i][1]}</p>
           </span>
           <time>{n[3]}</time>
         </button>

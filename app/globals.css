@@ -1933,3 +1933,9 @@ button[data-slot='button'][data-variant='default'] {
   .issue-card, .page-heading h1, .page-heading p, .cycle-strip:after, .cycle-strip:before, .cycle-orbit, [role='dialog'] { animation: none !important; }
   .issue-card:hover, .sidebar a:hover, .sidebar button:hover { translate: none !important; }
 }
+
+.lang-switch { display: flex; gap: 2px; padding: 2px; border: 1px solid color-mix(in oklab, currentColor 15%, transparent); border-radius: 999px; font-size: 10px; font-weight: 600; }
+.lang-switch button { min-width: 28px; min-height: 28px; border-radius: 999px; opacity: .6; }
+.lang-switch button[aria-pressed="true"] { opacity: 1; background: color-mix(in oklab, currentColor 14%, transparent); }
+.lang-switch button:hover { opacity: 1; }
+.lang-switch { margin: 0; min-inline-size: 0; }
